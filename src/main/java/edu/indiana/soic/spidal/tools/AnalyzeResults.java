@@ -95,7 +95,7 @@ public class AnalyzeResults {
             (s1, s2) -> s1 + "\n" + s2);
         if (str.isPresent()){
             sendEmail(fromEmail, fromEmailPw, toEmails, str.get());
-            Files.move(Paths.get(outDir), Paths.get("bad."+date+outDir),
+            Files.move(Paths.get(outDir), Paths.get(outDir + "bad."+date.toString().replace(' ', '.')),
                        StandardCopyOption.REPLACE_EXISTING);
         }
 
