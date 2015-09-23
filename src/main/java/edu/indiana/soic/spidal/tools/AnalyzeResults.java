@@ -69,7 +69,13 @@ public class AnalyzeResults {
         String fromEmail = cmd.getOptionValue(opFromEmail).trim();
         String fromEmailPw = cmd.getOptionValue(opFromEmailPw);
 
-        Stream<Path> dirs = Files.list(Paths.get(outDir)).filter(f -> Files.isDirectory(f));
+        final Path outDirPath = Paths.get(outDir);
+        if (!Files.exists(outDirPath)) {
+            System.out.println("Output directory " + outDir + " does not exist");
+            System.out.println("\n== " + programName + " run completed with errors" + " ==\n");
+            return;
+        }
+        Stream<Path> dirs = Files.list(outDirPath).filter(f -> Files.isDirectory(f));
         Object [] values = dirs.map(dir -> {
             try {
                 String dirName = com.google.common.io.Files.getNameWithoutExtension(dir.toString());
@@ -95,9 +101,10 @@ public class AnalyzeResults {
             (s1, s2) -> s1 + "\n" + s2);
         if (str.isPresent()){
             sendEmail(fromEmail, fromEmailPw, toEmails, str.get());
-            Files.move(Paths.get(outDir), Paths.get(outDir + ".SLOW."+date.toString().replace(' ', '.')),
+            Files.move(outDirPath, Paths.get(outDir + ".SLOW."+date.toString().replace(' ', '.')),
                        StandardCopyOption.REPLACE_EXISTING);
         }
+        System.out.println("\n== " + programName + " run completed successfully" + " ==\n");
 
     }
 
