@@ -1,7 +1,8 @@
-package org.saliya.mmbench.tools;
+package edu.indiana.soic.spidal.tools;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
+import edu.indiana.soic.spidal.Utils;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
@@ -19,8 +20,6 @@ import java.util.Date;
 import java.util.Properties;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-
-import static org.saliya.mmbench.Utils.parseCommandLineArguments;
 
 public class AnalyzeResults {
     private static String programName = "analyzer";
@@ -44,7 +43,7 @@ public class AnalyzeResults {
     public static void main(String[] args)
         throws IOException, InterruptedException, AddressException {
         Optional<CommandLine> parserResult =
-            parseCommandLineArguments(args, options);
+            Utils.parseCommandLineArguments(args, options);
 
         if (!parserResult.isPresent()) {
             System.out.println("Argument passing failed");

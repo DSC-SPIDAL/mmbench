@@ -1,4 +1,4 @@
-package org.saliya.mmbench;
+package edu.indiana.soic.spidal;
 
 import com.google.common.base.Optional;
 import org.apache.commons.cli.*;

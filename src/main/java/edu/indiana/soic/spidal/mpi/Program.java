@@ -1,4 +1,4 @@
-package org.saliya.mmbench.serial;
+package edu.indiana.soic.spidal.mpi;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Stopwatch;
@@ -6,6 +6,7 @@ import com.google.common.base.Strings;
 import org.apache.commons.cli.*;
 
 import java.io.*;
+import java.nio.DoubleBuffer;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,11 +17,10 @@ import java.util.Date;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-
-import static org.saliya.mmbench.Utils.parseCommandLineArguments;
+import java.util.stream.IntStream;
 
 public class Program {
-    private static String programName = "mmbench";
+    private static String programName = "mmbenchmpi";
     private static String opDataPoints = "dataPoints";
     private static String opT = "tpp";
     private static String opP = "ppn";
@@ -51,6 +51,11 @@ public class Program {
 
     public static void main(String[] args)
         throws IOException, InterruptedException {
+//        args = MPI.Init(args);
+//        Intracomm realProcComm = MPI.COMM_WORLD;
+//        int realProcCount = realProcComm.getSize();
+//        int realProcRank = realProcComm.getRank();
+
         Optional<CommandLine> parserResult =
             parseCommandLineArguments(args, options);
 
@@ -64,43 +69,54 @@ public class Program {
         System.out.println("\n== " + programName + " run started on " + new Date() + " ==\n");
         CommandLine cmd = parserResult.get();
         if (!(cmd.hasOption(opDataPoints) && cmd.hasOption(opT) && cmd.hasOption(opP) && cmd.hasOption(opN) && cmd.hasOption(opRank) && cmd.hasOption(opThread) && cmd.hasOption(opIterations))){
-            new HelpFormatter().printHelp(programName, options);
+//            if (realProcRank == 0){
+//                new HelpFormatter().printHelp(programName, options);
+//            }
             return;
         }
 
         int dataPoints = Integer.parseInt(cmd.getOptionValue(opDataPoints));
-        int tpp = Integer.parseInt(cmd.getOptionValue(opT));
-        int ppn = Integer.parseInt(cmd.getOptionValue(opP));
-        int n = Integer.parseInt(cmd.getOptionValue(opN));
+        int mimicTpp = Integer.parseInt(cmd.getOptionValue(opT));
+        int mimicPpn = Integer.parseInt(cmd.getOptionValue(opP));
+        int mimicN = Integer.parseInt(cmd.getOptionValue(opN));
+        // For now let's take rank as real proc rank
+//        int rank = realProcRank;
         int rank = Integer.parseInt(cmd.getOptionValue(opRank));
         int thread = Integer.parseInt(cmd.getOptionValue(opThread));
         int iterations = Integer.parseInt(cmd.getOptionValue(opIterations));
-        int blockSize = cmd.hasOption(opBlockSize) ? Integer.parseInt(cmd.getOptionValue(opIterations)) : 64;
-        int printFreq = cmd.hasOption(opPrintFreq) ? Integer.parseInt(cmd.getOptionValue(opPrintFreq)) : 100;
+        int blockSize = cmd.hasOption(opBlockSize) ? Integer.parseInt(
+            cmd.getOptionValue(opIterations)) : 64;
+        int printFreq = cmd.hasOption(opPrintFreq) ? Integer.parseInt(
+            cmd.getOptionValue(opPrintFreq)) : 100;
         String initialPointsFile = cmd.hasOption(opInitialPoints) ? cmd.getOptionValue(opInitialPoints) : "";
         String outDir = cmd.hasOption(opOutDir) ? cmd.getOptionValue(opOutDir) : ".";
 
-        int worldSize = ppn * n;
+        int mimicWorldSize = mimicPpn * mimicN;
         int globalColCount = dataPoints;
 
         // Decompose among processes
-        int q = dataPoints / worldSize;
-        int r = dataPoints % worldSize;
-        int procRowCount = rank < r ? q+1 : q;
-        int procRowOffset = rank * q + (rank < r ? rank : r);
+        int q = dataPoints / mimicWorldSize;
+        int r = dataPoints % mimicWorldSize;
+        int mimicProcRowCount = rank < r ? q+1 : q;
+        int mimicProcRowOffset = rank * q + (rank < r ? rank : r);
 
         // Decompose among threads
-        q = procRowCount / tpp;
-        r = procRowCount % tpp;
-        int threadRowCount = thread < r ? q+1 : q;
-        int threadRowOffset = thread * q + (thread < r ? thread : r);
+        q = mimicProcRowCount / mimicTpp;
+        r = mimicProcRowCount % mimicTpp;
+        int mimicThreadRowCount = thread < r ? q+1 : q;
+        int mimicThreadRowOffset = thread * q + (thread < r ? thread : r);
 
-        double[] v = generateDiagonalValues(globalColCount, procRowCount);
-        double[][] x = Strings.isNullOrEmpty(initialPointsFile) ? generateInitMapping(
-            dataPoints, targetDimension): readInitMapping(initialPointsFile, dataPoints, targetDimension);
-        short[][] weights = generateWeights(threadRowCount, globalColCount, 1.0);
+//        DoubleBuffer partialPointsBuffer = MPI.newDoubleBuffer(mimicThreadRowCount * targetDimension);
+//        DoubleBuffer fullPointsBuffer = MPI.newDoubleBuffer(mimicThreadRowCount * realProcCount * targetDimension);
 
-        Path outputFile = Paths.get(outDir, "mmout." + tpp + "x" + ppn + "x" + n + "." + dataPoints + ".r" + rank  +".t" + thread + "." + getMachineName() + ".txt");
+        double[] v = generateDiagonalValues(globalColCount, mimicProcRowCount);
+        double[][] x ;
+        short[][] weights = generateWeights(mimicThreadRowCount, globalColCount, 1.0);
+
+        Path outputFile = Paths.get(
+            outDir,
+            "mmout." + mimicTpp + "x" + mimicPpn + "x" + mimicN + "." + dataPoints + ".r." +
+            rank + ".t." + thread + "." + getMachineName() + ".txt");
         BufferedWriter bw = Files.newBufferedWriter(
             outputFile, StandardOpenOption.WRITE, StandardOpenOption.CREATE);
         PrintWriter writer = new PrintWriter(bw, true);
@@ -114,11 +130,14 @@ public class Program {
             x = Strings.isNullOrEmpty(initialPointsFile) ? generateInitMapping(
                 dataPoints, targetDimension): readInitMapping(initialPointsFile, dataPoints, targetDimension);
             timer.start();
-            double [][] result = matrixMultiplyWithThreadOffset(weights, v, x, threadRowCount, targetDimension, dataPoints, blockSize, threadRowOffset, procRowOffset);
+            double [][] result = matrixMultiplyWithThreadOffset(weights, v, x, mimicThreadRowCount, targetDimension, dataPoints, blockSize, mimicThreadRowOffset, mimicProcRowOffset);
             timer.stop();
             timings[i] = timer.elapsed(TimeUnit.MILLISECONDS);
             timer.reset();
-            dummyPrint(result);
+//            copyPointsToBuffer(result, partialPointsBuffer);
+//            allGather(partialPointsBuffer, fullPointsBuffer, targetDimension, realProcComm, realProcRank, realProcCount, mimicThreadRowCount);
+//            dummyPrint(fullPointsBuffer);
+            dummyPrint(x);
             if ((i+1) % printFreq == 0){
                 double[] totAndAvg = getTotalAndAverageTiming(timings, i - (printFreq - 1), i);
                 System.out.println("Done. Total: " + totAndAvg[0] + " ms Avg: " + totAndAvg[1] + " ms");
@@ -126,7 +145,8 @@ public class Program {
         }
 
         double[] totAndAvg = getTotalAndAverageTiming(timings, 0, timings.length - 1);
-        System.out.println("Total: " + totAndAvg[0] + " ms Avg: " + totAndAvg[1] + " ms");
+        System.out.println("Total: " + totAndAvg[0] + " ms Avg: " + totAndAvg
+                               [1] + " ms");
 
         String str = Arrays.toString(timings);
         writer.println(str.substring(1, str.length() - 1).replace(',', '\t'));
@@ -137,7 +157,31 @@ public class Program {
         writer.flush();
         writer.close();
 
+//        MPI.Finalize();
     }
+
+    private static void copyPointsToBuffer(double[][] points, DoubleBuffer result){
+        result.position(0);
+        for (double [] point : points){
+            result.put(point);
+        }
+    }
+
+    /*private static DoubleBuffer allGather(
+        DoubleBuffer partialPointBuffer, DoubleBuffer fullPointBuffer, int dimension, Intracomm realProcComm, int realProcRank, int realProcCount, int mimicRowCount) throws MPIException {
+
+        int [] lengths = new int[realProcCount];
+        int length = mimicRowCount * dimension;
+        lengths[realProcRank] = length;
+//        realProcComm.allGather(lengths, 1, MPI.INT);
+        int [] displas = new int[realProcCount];
+        displas[0] = 0;
+        System.arraycopy(lengths, 0, displas, 1, realProcCount - 1);
+        Arrays.parallelPrefix(displas, (m, n) -> m + n);
+        int count = IntStream.of(lengths).sum(); // performs very similar to usual for loop, so no harm done
+//        realProcComm.allGatherv(partialPointBuffer, length, MPI.DOUBLE, fullPointBuffer, lengths, displas, MPI.DOUBLE);
+        return  fullPointBuffer;
+    }*/
 
     private static double[] getTotalAndAverageTiming(
         long[] timings, int startInc, int endInc) {
@@ -172,6 +216,12 @@ public class Program {
         return out.substring(0,out.length()-1);
     }
 
+    // To avoid any optimization
+    private static void dummyPrint(DoubleBuffer buffer){
+        if (buffer.capacity() == (int)(Math.random()*10)) {
+            System.out.println(buffer.get((int)(Math.random()*buffer.capacity())));
+        }
+    }
     // To avoid any optimization
     private static void dummyPrint(double[][] array){
         if (array.length == (int)(Math.random()*10)) {
@@ -319,4 +369,19 @@ public class Program {
         }
         return points;
     }
+
+    private static Optional<CommandLine> parseCommandLineArguments(
+        String[] args, Options opts) {
+
+        CommandLineParser optParser = new GnuParser();
+
+        try {
+            return Optional.fromNullable(optParser.parse(opts, args));
+        }
+        catch (ParseException e) {
+            System.out.println(e);
+        }
+        return Optional.fromNullable(null);
+    }
+
 }
