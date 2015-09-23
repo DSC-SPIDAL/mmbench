@@ -138,7 +138,7 @@ public class AnalyzeResults {
             message.setFrom(new InternetAddress(username));
             message.setRecipients(Message.RecipientType.TO,
                                   toEmails);
-            message.setSubject("Slow Performance on Juliet " + new Date());
+            message.setSubject("MMBench Slow Performance on Juliet " + new Date());
             message.setText(msg);
 
             Transport.send(message);

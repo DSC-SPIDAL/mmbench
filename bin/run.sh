@@ -67,6 +67,6 @@ while true; do
     done
 
     $wd/run.analyzer.sh $OP_OUTDIR $OP_CUT $OP_TO $OP_FROM $OP_FROMPW
-    printf "Run %s completed" $run
+    printf "Run %s completed\n" $run
     run=$(($run+1))
 done
