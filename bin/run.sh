@@ -25,7 +25,7 @@ run=1
 while true; do
     if [ -f $OP_STOPFILE ]
     then
-	printf "Stopping runs as file: %s found" $OP_STOPFILE
+	printf "Stopping runs as file: %s found\n" $OP_STOPFILE
 	break;
     fi
     if [ -d $OP_OUTDIR ]
@@ -67,6 +67,6 @@ while true; do
     done
 
     $wd/run.analyzer.sh $OP_OUTDIR $OP_CUT $OP_TO $OP_FROM $OP_FROMPW
-    printf "Run %s completed\n" $run
+    printf "Run %s completed on %s\n" $run `date` >> log.run.txt
     run=$(($run+1))
 done
