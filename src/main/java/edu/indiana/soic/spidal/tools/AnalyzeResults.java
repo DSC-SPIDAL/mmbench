@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Date;
 import java.util.Properties;
 import java.util.regex.Pattern;
@@ -52,7 +53,8 @@ public class AnalyzeResults {
             return;
         }
 
-        System.out.println("\n== " + programName + " run started on " + new Date() + " ==\n");
+        final Date date = new Date();
+        System.out.println("\n== " + programName + " run started on " + date + " ==\n");
         CommandLine cmd = parserResult.get();
         if (!(cmd.hasOption(opOutDir) && cmd.hasOption(opCut) && cmd.hasOption(
             opToEmail) && cmd.hasOption(opFromEmail) && cmd.hasOption(
@@ -93,6 +95,8 @@ public class AnalyzeResults {
             (s1, s2) -> s1 + "\n" + s2);
         if (str.isPresent()){
             sendEmail(fromEmail, fromEmailPw, toEmails, str.get());
+            Files.move(Paths.get(outDir), Paths.get("bad."+date+outDir),
+                       StandardCopyOption.REPLACE_EXISTING);
         }
 
     }
