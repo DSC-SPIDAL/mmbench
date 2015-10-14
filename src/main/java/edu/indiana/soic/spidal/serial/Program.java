@@ -94,10 +94,6 @@ public class Program {
         int threadRowCount = thread < r ? q+1 : q;
         int threadRowOffset = thread * q + (thread < r ? thread : r);
 
-        double[] v = generateDiagonalValues(globalColCount, procRowCount);
-        double[][] x = Strings.isNullOrEmpty(initialPointsFile) ? generateInitMapping(
-            dataPoints, targetDimension): readInitMapping(initialPointsFile, dataPoints, targetDimension);
-        short[][] weights = generateWeights(threadRowCount, globalColCount, 1.0);
 
         Path outputFile = Paths.get(outDir, "mmout." + tpp + "x" + ppn + "x" + n + "." + dataPoints + ".r" + rank  +".t" + thread + "." + getMachineName() + ".txt");
         BufferedWriter bw = Files.newBufferedWriter(
@@ -109,11 +105,9 @@ public class Program {
             if (i % printFreq == 0){
                 System.out.print(" Iterations [" + i + "," + (printFreq + i - 1) + "] ... " );
             }
-            // Just checking if creating a new array each time as in DAMDS will produce the same effect
-            x = Strings.isNullOrEmpty(initialPointsFile) ? generateInitMapping(
-                dataPoints, targetDimension): readInitMapping(initialPointsFile, dataPoints, targetDimension);
+
             timer.start();
-            double [][] result = matrixMultiplyWithThreadOffset(weights, v, x, threadRowCount, targetDimension, dataPoints, blockSize, threadRowOffset, procRowOffset);
+            double result = matrixMultiplyWithThreadOffset(threadRowCount, targetDimension, dataPoints, blockSize, threadRowOffset, procRowOffset);
             timer.stop();
             timings[i] = timer.elapsed(TimeUnit.MILLISECONDS);
             timer.reset();
@@ -172,13 +166,10 @@ public class Program {
     }
 
     // To avoid any optimization
-    private static void dummyPrint(double[][] array){
-        if (array.length == (int)(Math.random()*10)) {
-            int length = array.length;
-            int randomRow = (int) (Math.random() * length);
-            length = array[randomRow].length;
-            int randomCol = (int) (Math.random() * length);
-            System.out.print(array[randomRow][randomCol]);
+    private static void dummyPrint(double a){
+
+        if (a == (int)(Math.random()*10)) {
+            System.out.print(a);
         }
     }
 
@@ -207,10 +198,9 @@ public class Program {
         return v;
     }
 
-    public static double[][] matrixMultiplyWithThreadOffset(
-        short[][] A, double[] Adiag, double[][] B,
+    public static double matrixMultiplyWithThreadOffset(
         int aHeight, int bWidth, int comm, int bz, int threadRowOffset, int procRowOffset) {
-        double[][] C = new double[aHeight][bWidth];
+        double c = 0.0;
 
         int aHeightBlocks = aHeight / bz; // size = Height of A
         int aLastBlockHeight = aHeight - (aHeightBlocks * bz);
@@ -257,15 +247,15 @@ public class Program {
                                  k < (kb * bz) + commBlockWidth; k++) {
                                 double aVal = 0;
                                 if (i + procRowOffset == k) {
-                                    aVal = Adiag[i];
+                                    aVal = Math.random()*i;
                                 }
                                 else {
                                     //reverse the value from weight
-                                    aVal = -(A[i+threadRowOffset][k] * 1.0 / Short.MAX_VALUE);
+                                    aVal = -(Math.random() * (i+threadRowOffset)*k * 1.0 / Short.MAX_VALUE);
                                 }
 
-                                if (aVal != 0 && B[k][j] != 0) {
-                                    C[i][j] += aVal * B[k][j];
+                                if (aVal != 0 && Math.random()*k*j != 0) {
+                                    c += aVal * Math.random()*k*j;
                                 }
                             }
                         }
@@ -274,7 +264,7 @@ public class Program {
             }
         }
 
-        return C;
+        return c;
     }
 
     private static double[][] readInitMapping(
